@@ -1,0 +1,248 @@
+#!/usr/bin/env node
+
+/**
+ * ForgeLab CLI Entry Point
+ * 
+ * This script is called by Paperclip to execute ForgeLab agents.
+ * It receives context via environment variables and agent configuration.
+ */
+
+import { spawn } from 'node:child_process';
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const config = {
+  workspacePath: null,
+  agentName: null,
+  wakeReason: null,
+  task: null,
+  help: false,
+};
+
+// Parse arguments
+for (let i = 0; i < args.length; i++) {
+  switch (args[i]) {
+    case '--workspace':
+    case '-w':
+      config.workspacePath = args[++i];
+      break;
+    case '--agent':
+    case '-a':
+      config.agentName = args[++i];
+      break;
+    case '--wake-reason':
+      config.wakeReason = args[++i];
+      break;
+    case '--task':
+    case '-t':
+      config.task = args[++i];
+      break;
+    case '--help':
+    case '-h':
+      config.help = true;
+      break;
+  }
+}
+
+// Show help
+if (config.help) {
+  console.log(`
+ForgeLab CLI - AI Agent Runtime
+
+Usage: forge [options]
+
+Options:
+  -w, --workspace <path>    Path to ForgeLab workspace (default: current dir)
+  -a, --agent <name>        Agent name to execute
+  -t, --task <id>           Task ID from Paperclip
+  --wake-reason <reason>    Wake reason (heartbeat, task, manual)
+  -h, --help                Show this help message
+
+Environment Variables:
+  FORGELAB_RUN_ID           Paperclip run identifier
+  FORGELAB_AGENT_ID         Paperclip agent identifier  
+  FORGELAB_COMPANY_ID       Paperclip company identifier
+  FORGELAB_PAPERCLIP_CONTEXT JSON string with full context
+  FORGELAB_LOG_LEVEL        Log level (debug/info/warn/error)
+  GEMINI_API_KEY            Gemini API key (required)
+
+Examples:
+  forge --agent software-architect --task task_123
+  forge -w /path/to/workspace -a content-creator
+`);
+  process.exit(0);
+}
+
+// Resolve workspace path
+const workspacePath = config.workspacePath || process.cwd();
+
+// Load environment from .env file if it exists
+const envPath = join(workspacePath, '..', '.env');
+if (existsSync(envPath)) {
+  const envContent = readFileSync(envPath, 'utf-8');
+  envContent.split('\n').forEach(line => {
+    const [key, ...valueParts] = line.split('=');
+    if (key && valueParts.length > 0) {
+      const value = valueParts.join('=').trim();
+      if (value && !process.env[key.trim()]) {
+        process.env[key.trim()] = value;
+      }
+    }
+  });
+}
+
+// Validate required environment
+if (!process.env.GEMINI_API_KEY) {
+  console.error('[forgelab:error] GEMINI_API_KEY is required but not set');
+  console.error('[forgelab:error] Set it in .env file or as environment variable');
+  process.exit(1);
+}
+
+// Get Paperclip context
+let paperclipContext = null;
+if (process.env.FORGELAB_PAPERCLIP_CONTEXT) {
+  try {
+    paperclipContext = JSON.parse(process.env.FORGELAB_PAPERCLIP_CONTEXT);
+    console.log(`[forgelab] Paperclip context received:`);
+    console.log(`  - Run ID: ${paperclipContext.paperclip?.runId || 'N/A'}`);
+    console.log(`  - Company: ${paperclipContext.paperclip?.company?.id || 'N/A'}`);
+    console.log(`  - Agent: ${paperclipContext.paperclip?.agent?.name || 'N/A'}`);
+    console.log(`  - Task: ${paperclipContext.paperclip?.task?.key || config.task || 'N/A'}`);
+  } catch (e) {
+    console.log(`[forgelab] Could not parse Paperclip context: ${e.message}`);
+  }
+}
+
+// Determine which agent to run
+const agentName = config.agentName || paperclipContext?.paperclip?.agent?.name;
+
+if (!agentName) {
+  console.error('[forgelab:error] No agent specified. Use --agent <name> or set agent name in Paperclip.');
+  process.exit(1);
+}
+
+console.log(`[forgelab] Starting agent: ${agentName}`);
+console.log(`[forgelab] Workspace: ${workspacePath}`);
+console.log(`[forgelab] Wake reason: ${config.wakeReason || 'manual'}`);
+
+// Path to the agent workspace
+const agentWorkspace = join(workspacePath, 'agents', agentName);
+
+if (!existsSync(agentWorkspace)) {
+  console.error(`[forgelab:error] Agent workspace not found: ${agentWorkspace}`);
+  process.exit(1);
+}
+
+// Read agent configuration
+const agentsMdPath = join(agentWorkspace, 'AGENTS.md');
+const identityPath = join(agentWorkspace, 'IDENTITY.md');
+const soulPath = join(agentWorkspace, 'SOUL.md');
+const toolsPath = join(agentWorkspace, 'TOOLS.md');
+
+console.log(`[forgelab] Loading agent configuration from: ${agentWorkspace}`);
+
+// Build the agent prompt based on Paperclip task
+let systemPrompt = '';
+
+if (existsSync(identityPath)) {
+  const identity = readFileSync(identityPath, 'utf-8');
+  systemPrompt += `# Identity\n${identity}\n\n`;
+}
+
+if (existsSync(soulPath)) {
+  const soul = readFileSync(soulPath, 'utf-8');
+  systemPrompt += `# Core Principles\n${soul}\n\n`;
+}
+
+if (existsSync(agentsMdPath)) {
+  const agents = readFileSync(agentsMdPath, 'utf-8');
+  systemPrompt += `# Workspace Guidelines\n${agents}\n\n`;
+}
+
+// Add Paperclip task context
+if (paperclipContext) {
+  systemPrompt += `# Current Task (from Paperclip)\n`;
+  systemPrompt += `You are working as part of a company managed by Paperclip.\n`;
+  systemPrompt += `Your role: ${paperclipContext.paperclip?.agent?.name || agentName}\n`;
+  systemPrompt += `Company ID: ${paperclipContext.paperclip?.company?.id || 'N/A'}\n`;
+  systemPrompt += `Task: ${paperclipContext.paperclip?.task?.key || config.task || 'No specific task assigned'}\n\n`;
+}
+
+// Add wake reason context
+if (config.wakeReason) {
+  systemPrompt += `# Wake Context\n`;
+  systemPrompt += `You were awakened because: ${config.wakeReason}\n\n`;
+}
+
+// Log system prompt (truncated for brevity)
+const logLevel = process.env.FORGELAB_LOG_LEVEL || 'info';
+if (logLevel === 'debug') {
+  console.log(`[forgelab:debug] System prompt (${systemPrompt.length} chars):`);
+  console.log(systemPrompt.substring(0, 500) + '...');
+}
+
+// Prepare to call the LLM
+console.log(`[forgelab] Initializing Gemini API...`);
+
+// Create the main execution function
+async function runAgent() {
+  try {
+    // Import Gemini SDK dynamically
+    const { GoogleGenAI } = await import('@google/genai');
+    
+    const genAI = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+    });
+
+    // Build the user message based on wake reason
+    let userMessage = '';
+    
+    if (config.wakeReason === 'heartbeat') {
+      userMessage = 'Heartbeat check. Review your HEARTBEAT.md if it exists. Report what needs attention or reply with status.';
+    } else if (config.task || paperclipContext?.paperclip?.task?.key) {
+      userMessage = `Execute your assigned task. Use your tools and capabilities to make progress. Report your actions and results.`;
+    } else {
+      userMessage = 'Awaiting instructions. Review your workspace context and report your current status and capabilities.';
+    }
+
+    console.log(`[forgelab] Sending request to Gemini...`);
+
+    // Call Gemini API
+    const response = await genAI.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: `${systemPrompt}\n\n# Current Request\n${userMessage}`,
+      config: {
+        temperature: 0.7,
+        topP: 0.95,
+        maxOutputTokens: 8192,
+      },
+    });
+
+    // Output the response
+    const responseText = response.text;
+    
+    console.log(`\n## Response\n${responseText}\n`);
+    console.log(`[forgelab] Agent execution completed successfully`);
+    
+    // Try to extract token usage if available
+    if (response.usageMetadata) {
+      console.log(`[forgelab] Tokens: ${response.usageMetadata.promptTokenCount} input, ${response.usageMetadata.candidatesTokenCount} output`);
+    }
+    
+    process.exit(0);
+  } catch (error) {
+    console.error(`[forgelab:error] Agent execution failed: ${error.message}`);
+    if (logLevel === 'debug') {
+      console.error(error.stack);
+    }
+    process.exit(1);
+  }
+}
+
+// Run the agent
+runAgent();

@@ -1,0 +1,150 @@
+{
+  "workspace": {
+    "folders": [
+      "/Users/manojsharmayandapally/PycharmProjects/forgelab",
+      "/Users/manojsharmayandapally/PycharmProjects/paperclip"
+    ]
+  },
+  "modelProviders": {
+    "gemini": [
+      {
+        "id": "gemini-1.5-flash",
+        "name": "Gemini 1.5 Flash",
+        "envKey": "GEMINI_API_KEY",
+        "baseUrl": "https://generativelanguage.googleapis.com",
+        "capabilities": {
+          "vision": true,
+          "code": true
+        },
+        "generationConfig": {
+          "timeout": 60000,
+          "maxRetries": 2,
+          "contextWindowSize": 1000000,
+          "samplingParams": {
+            "temperature": 0.4,
+            "top_p": 0.95,
+            "max_tokens": 8192,
+            "top_k": 40
+          }
+        }
+      },
+      {
+        "id": "gemini-1.5-flash-8b",
+        "name": "Gemini 1.5 Flash-8B",
+        "envKey": "GEMINI_API_KEY",
+        "baseUrl": "https://generativelanguage.googleapis.com",
+        "capabilities": {
+          "vision": true,
+          "code": true
+        },
+        "generationConfig": {
+          "timeout": 45000,
+          "maxRetries": 2,
+          "contextWindowSize": 1000000,
+          "samplingParams": {
+            "temperature": 0.5,
+            "top_p": 0.95,
+            "max_tokens": 4096,
+            "top_k": 40
+          }
+        }
+      },
+      {
+        "id": "gemini-1.5-pro",
+        "name": "Gemini 1.5 Pro",
+        "envKey": "GEMINI_API_KEY",
+        "baseUrl": "https://generativelanguage.googleapis.com",
+        "capabilities": {
+          "vision": true,
+          "code": true,
+          "reasoning": true
+        },
+        "generationConfig": {
+          "timeout": 120000,
+          "maxRetries": 3,
+          "contextWindowSize": 2000000,
+          "samplingParams": {
+            "temperature": 0.2,
+            "top_p": 0.95,
+            "max_tokens": 16384,
+            "top_k": 40
+          }
+        }
+      },
+      {
+        "id": "gemini-2.0-flash-exp",
+        "name": "Gemini 2.0 Flash (Experimental)",
+        "envKey": "GEMINI_API_KEY",
+        "baseUrl": "https://generativelanguage.googleapis.com",
+        "capabilities": {
+          "vision": true,
+          "code": true,
+          "audio": true
+        },
+        "generationConfig": {
+          "timeout": 60000,
+          "maxRetries": 2,
+          "contextWindowSize": 1000000,
+          "samplingParams": {
+            "temperature": 0.3,
+            "top_p": 0.95,
+            "max_tokens": 8192,
+            "top_k": 40
+          }
+        }
+      },
+      {
+        "id": "gemini-2.0-flash-lite",
+        "name": "Gemini 2.0 Flash Lite",
+        "envKey": "GEMINI_API_KEY",
+        "baseUrl": "https://generativelanguage.googleapis.com",
+        "capabilities": {
+          "vision": true,
+          "code": true
+        },
+        "generationConfig": {
+          "timeout": 45000,
+          "maxRetries": 2,
+          "contextWindowSize": 1000000,
+          "samplingParams": {
+            "temperature": 0.5,
+            "top_p": 0.95,
+            "max_tokens": 4096,
+            "top_k": 40
+          }
+        }
+      },
+      {
+        "id": "gemini-2.0-flash-thinking-exp",
+        "name": "Gemini 2.0 Flash Thinking",
+        "envKey": "GEMINI_API_KEY",
+        "baseUrl": "https://generativelanguage.googleapis.com",
+        "capabilities": {
+          "vision": true,
+          "code": true,
+          "reasoning": true
+        },
+        "generationConfig": {
+          "timeout": 90000,
+          "maxRetries": 2,
+          "contextWindowSize": 1000000,
+          "samplingParams": {
+            "temperature": 0.2,
+            "top_p": 0.95,
+            "max_tokens": 8192,
+            "top_k": 40
+          }
+        }
+      }
+    ]
+  },
+  "$version": 3,
+  "security": {
+    "auth": {
+      "selectedType": "qwen-oauth"
+    }
+  },
+  "model": {
+    "name": "coder-model"
+  }
+}

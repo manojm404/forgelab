@@ -1,0 +1,26 @@
+{
+  "name": "forgelab",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "ForgeLab - Persistent AI Agent Framework with Memory and Identity",
+  "main": "forge",
+  "bin": {
+    "forge": "./forge"
+  },
+  "scripts": {
+    "start": "node forge.js",
+    "forge": "node forge.js"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "forge",
+    "paperclip",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "^0.2.0"
+  }
+}
