@@ -8,6 +8,7 @@
     "forge": "./forge"
   },
   "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix ui\"",
     "start": "node forge.js",
     "forge": "node forge.js"
   },
@@ -22,5 +23,8 @@
   "license": "MIT",
   "dependencies": {
     "@google/genai": "^0.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

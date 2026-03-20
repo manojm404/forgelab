@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Agent {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  role        String
+  model       String   @default("gemini-1.5-flash")
+  identity    String?
+  soul        String?
+  tools       String?  // Stored as JSON string
+  status      String   @default("idle") // idle, working, paused, error
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastRun     DateTime?
+  totalTasks  Int      @default(0)
+  successRate Float    @default(0.0)
+
+  tasks       Task[]
+  runs        Run[]
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  agentId     String
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  priority    String   @default("medium") // low, medium, high, critical
+  status      String   @default("pending") // pending, assigned, in-progress, completed, failed, blocked
+  context     String?  // JSON string
+  createdBy   String   @default("user") // user, agent, system
+  parentTaskId String?
+  tags        String?  // JSON string
+  deadline    DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  runs        Run[]
+}
+
+model Run {
+  id          String   @id @default(uuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  agentId     String
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  status      String   @default("running") // running, completed, failed, cancelled
+  tokensUsed  Int      @default(0)
+  cost        Float    @default(0.0)
+
+  transcripts Transcript[]
+}
+
+model Transcript {
+  id          String   @id @default(uuid())
+  runId       String
+  run         Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  timestamp   DateTime @default(now())
+  type        String   // system, assistant, tool, user, error
+  content     String
+  metadata    String?  // JSON string
+}
+
+model Setting {
+  key         String   @id
+  value       String
+  updatedAt   DateTime @updatedAt
+}
