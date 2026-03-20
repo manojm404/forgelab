@@ -71,4 +71,3 @@ service-account.json
 ui/dist/
 .qwen/
 node_modules/.package-lock.json
-workspace/
