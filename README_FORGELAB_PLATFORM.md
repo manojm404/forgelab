@@ -30,3 +30,25 @@ npm run dev
 ## Next Steps
 - Build the "Agents" tab to list and edit all 154 synced agents.
 - Build the "Console" tab with a live terminal UI that connects to the Socket.io stream.
+# ForgeLab Platform
+
+This is the standalone platform for ForgeLab, moving away from the Paperclip adapter model.
+
+## Architecture
+- **Frontend (ui/)**: Vite + React + TailwindCSS + shadcn/ui + Framer Motion
+- **Backend (server/)**: Express + Socket.io + Prisma (SQLite for local MVP, ready for PostgreSQL)
+- **Engine (forge)**: Existing Gemini-powered CLI engine
+
+## Getting Started
+
+### Start the Backend
+```bash
+cd server
+npm run dev
+```
+
+### Start the Frontend
+```bash
+cd ui
+npm run dev
+```

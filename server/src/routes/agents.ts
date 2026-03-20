@@ -2,9 +2,11 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
+import { ContextManager } from '../engine/contextManager';
 
 const router = Router();
 const prisma = new PrismaClient();
+const contextManager = new ContextManager(path.resolve(__dirname, '../../../workspace'));
 
 // Helper to get workspace path from settings or fallback
 async function getWorkspacePath() {
@@ -80,6 +82,7 @@ router.post('/', async (req, res) => {
     fs.writeFileSync(path.join(agentDir, 'IDENTITY.md'), agent.identity!);
     fs.writeFileSync(path.join(agentDir, 'SOUL.md'), agent.soul!);
 
+    await contextManager.updateContext();
     res.status(201).json(agent);
   } catch (error) {
     console.error(error);
@@ -114,6 +117,7 @@ router.put('/:id', async (req, res) => {
       if (soul) fs.writeFileSync(path.join(agentDir, 'SOUL.md'), soul);
     }
 
+    await contextManager.updateContext();
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: 'Failed to update agent' });
@@ -179,6 +183,7 @@ router.post('/sync', async (req, res) => {
       syncedAgents.push(agent);
     }
 
+    await contextManager.updateContext();
     res.json({ message: `Synced ${syncedAgents.length} agents`, agents: syncedAgents });
   } catch (error) {
     console.error('Error syncing agents:', error);

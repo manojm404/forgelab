@@ -97,7 +97,7 @@ Navigate to http://localhost:3100
    {
      "workspacePath": "/Users/manojsharmayandapally/PycharmProjects/forgelab/workspace",
      "agentName": "software-architect",
-     "geminiApiKey": "your-gemini-api-key-here",
+     "geminiApiKey": "[YOUR_API_KEY_HERE]",
      "timeoutSec": 600,
      "logLevel": "info",
      "preserveMemory": true

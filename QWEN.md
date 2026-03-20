@@ -1,0 +1,3 @@
+## Qwen Added Memories
+- ForgeLab is now an independent platform, decoupled from Paperclip. All future development should focus on ForgeLab as a standalone system.
+- Project context: ForgeLab is an independent multi-agent AI platform. Key features: Task management, Agent management, Workspace/File management, and a 'Multi-Agent Team' feature (Team Lead/Subordinate architecture). Workflow: Task Decomposition -> Agent Communication (Blackboard) -> Human Approval. Current state: Core architecture implemented, database schema updated for teams and shared blackboard, UI scaffolded for team dashboard. Future focus: Enhancing agent-to-agent collaboration and UI visibility for shared state.

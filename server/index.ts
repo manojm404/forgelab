@@ -9,6 +9,8 @@ import agentsRouter from './src/routes/agents';
 import createTasksRouter from './src/routes/tasks';
 import settingsRouter from './src/routes/settings';
 import dashboardRouter from './src/routes/dashboard';
+import workspaceRouter from './src/routes/workspace';
+import teamsRouter from './src/routes/teams';
 import { TaskRunner } from './src/engine/runner';
 
 dotenv.config();
@@ -40,6 +42,7 @@ app.use('/api/agents', agentsRouter);
 app.use('/api/tasks', createTasksRouter(runner));
 app.use('/api/settings', settingsRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/teams', teamsRouter);
 
 const PORT = process.env.PORT || 3001;
 

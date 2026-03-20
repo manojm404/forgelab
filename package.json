@@ -8,9 +8,13 @@
     "forge": "./forge"
   },
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix ui\"",
-    "start": "node forge.js",
-    "forge": "node forge.js"
+    "dev": "node start.cjs",
+    "start": "node start.cjs",
+    "start:server": "cd server && npm run dev",
+    "start:ui": "cd ui && npm run dev",
+    "forge": "node forge.js",
+    "migrate": "python scripts/migrate_agents.py --workspace workspace",
+    "cleanup": "python scripts/cleanup_old_files.py --workspace workspace"
   },
   "keywords": [
     "ai",
@@ -25,6 +29,7 @@
     "@google/genai": "^0.2.0"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "open": "^10.2.0"
   }
 }

@@ -4,6 +4,8 @@ import { Dashboard } from './pages/Dashboard';
 import { Agents } from './pages/Agents';
 import { AgentDetail } from './pages/AgentDetail';
 import { Console } from './pages/Console';
+import { Logs } from './pages/Logs';
+import { TeamDashboard } from './pages/TeamDashboard';
 import { Settings } from './pages/Settings';
 
 function App() {
@@ -15,6 +17,8 @@ function App() {
           <Route path="/agents" element={<Agents />} />
           <Route path="/agents/:id" element={<AgentDetail />} />
           <Route path="/console" element={<Console />} />
+          <Route path="/logs" element={<Logs />} />
+          <Route path="/team" element={<TeamDashboard />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </DashboardLayout>

@@ -44,7 +44,7 @@ Your Gemini API key must be accessible when Paperclip calls ForgeLab agents.
 
 ```bash
 # /path/to/forgelab/.env
-GEMINI_API_KEY=your-gemini-api-key-here
+GEMINI_API_KEY=[YOUR_API_KEY_HERE]
 ```
 
 **Option B: Pass via Paperclip Agent Config (Recommended for production)**
@@ -55,7 +55,7 @@ When configuring your ForgeLab agent in Paperclip UI:
 {
   "adapterType": "forgelab_local",
   "workspacePath": "/path/to/forgelab/workspace",
-  "geminiApiKey": "your-gemini-api-key-here",
+  "geminiApiKey": "[YOUR_API_KEY_HERE]",
   "agentName": "software-architect"
 }
 ```
@@ -63,7 +63,7 @@ When configuring your ForgeLab agent in Paperclip UI:
 **Option C: Environment Variable (For deployed systems)**
 
 ```bash
-export GEMINI_API_KEY=your-gemini-api-key-here
+export GEMINI_API_KEY=[YOUR_API_KEY_HERE]
 # Then start Paperclip
 pnpm dev
 ```
@@ -97,7 +97,7 @@ In Paperclip UI:
 {
   "workspacePath": "/Users/you/projects/forgelab/workspace",
   "agentName": "software-architect",
-  "geminiApiKey": "your-gemini-api-key-here",
+  "geminiApiKey": "[YOUR_API_KEY_HERE]",
   "timeoutSec": 600,
   "logLevel": "info"
 }
