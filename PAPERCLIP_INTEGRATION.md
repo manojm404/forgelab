@@ -97,7 +97,7 @@ In Paperclip UI:
 {
   "workspacePath": "/Users/you/projects/forgelab/workspace",
   "agentName": "software-architect",
-  "geminiApiKey": "AIzaSy...your-key",
+  "geminiApiKey": "your-gemini-api-key-here",
   "timeoutSec": 600,
   "logLevel": "info"
 }
