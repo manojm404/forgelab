@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
-import { Bot, Activity, Settings, Terminal, Plus, Menu } from 'lucide-react';
+import { Bot, Activity, Settings, Terminal, Plus, Menu, Users, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { icon: Activity, label: 'Dashboard', path: '/' },
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
   { icon: Bot, label: 'Agents', path: '/agents' },
+  { icon: Users, label: 'Teams', path: '/team' },
   { icon: Terminal, label: 'Console', path: '/console' },
   { icon: Settings, label: 'Settings', path: '/settings' },
 ];

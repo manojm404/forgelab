@@ -68,3 +68,7 @@ service-account.json
 .env.*.local
 .env.production
 .env.development
+ui/dist/
+.qwen/
+node_modules/.package-lock.json
+workspace/

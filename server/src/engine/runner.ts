@@ -65,6 +65,13 @@ export class TaskRunner {
         fs.chmodSync(this.forgePath, '755');
     }
 
+    // Check for approval gate
+    if (run.task.status === 'waiting-for-approval') {
+      this.io.emit('human:approval_required', { taskId: run.task.id });
+      console.log(`[forgelab] Task ${run.task.id} paused for approval.`);
+      return; // Pause execution
+    }
+
     // Spawn the ForgeLab CLI securely
     const args = [
       '--agent', run.agent.name,

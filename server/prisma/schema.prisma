@@ -24,19 +24,24 @@ model Agent {
 
   tasks       Task[]
   runs        Run[]
+  teamMembers TeamMember[]
 }
 
 model Task {
   id          String   @id @default(uuid())
   agentId     String
   agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  teamId      String?
+  team        Team?    @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  parentTaskId String?
+  parentTask  Task?    @relation("SubTasks", fields: [parentTaskId], references: [id])
+  subTasks    Task[]   @relation("SubTasks")
   title       String
   description String
   priority    String   @default("medium") // low, medium, high, critical
   status      String   @default("pending") // pending, assigned, in-progress, completed, failed, blocked
   context     String?  // JSON string
   createdBy   String   @default("user") // user, agent, system
-  parentTaskId String?
   tags        String?  // JSON string
   deadline    DateTime?
   completedAt DateTime?
@@ -45,6 +50,30 @@ model Task {
 
   runs        Run[]
 }
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  status      String   @default("active") // active, completed, archived
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks       Task[]
+  members     TeamMember[]
+  blackboard  Blackboard?
+  decisionLogs DecisionLog[]
+}
+model TeamMember {
+  id          String   @id @default(uuid())
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  agentId     String
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  role        String   // lead, backend, ui, devops, etc.
+  createdAt   DateTime @default(now())
+}
+
 
 model Run {
   id          String   @id @default(uuid())
@@ -71,8 +100,29 @@ model Transcript {
   metadata    String?  // JSON string
 }
 
+model Blackboard {
+  id          String   @id @default(uuid())
+  teamId      String   @unique
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  data        String   // JSON string storing shared variables/datasets
+  messages    String   // JSON string of conversation history
+  consensus   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+}
+
+model DecisionLog {
+  id          String   @id @default(uuid())
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  decision    String
+  reason      String?
+  timestamp   DateTime @default(now())
+}
+
 model Setting {
   key         String   @id
   value       String
   updatedAt   DateTime @updatedAt
 }
+
+
