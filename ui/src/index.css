@@ -54,6 +54,111 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-[#050505] text-foreground antialiased transition-colors duration-500;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+  html.light body {
+    @apply bg-[#f8f9fa] text-slate-900;
+  }
+}
+
+/* Light Mode Overrides */
+html.light body {
+  @apply bg-[#f8f9fa] text-slate-900;
+}
+
+html.light .bg-black\/40 {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  border-color: rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .bg-white\/5 {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.05) !important;
+  color: #475569 !important;
+}
+
+html.light .text-white\/50, 
+html.light .text-white\/40, 
+html.light .text-white\/30,
+html.light .text-white\/20 {
+  color: #64748b !important;
+}
+
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .border-white\/10,
+html.light .border-white\/5 {
+  border-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+html.light .backdrop-blur-3xl,
+html.light .backdrop-blur-xl {
+  backdrop-filter: blur(16px) !important;
+}
+
+html.light .bg-\[\#0c0c0c\],
+html.light .bg-\[\#080808\],
+html.light .bg-\[\#050505\] {
+  background-color: #f8f9fa !important;
+}
+
+html.light .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+
+@keyframes float {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(5deg); }
+  100% { transform: translateY(0px) rotate(0deg); }
+}
+
+.animate-cute-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient 15s ease infinite;
+}
+
+.glass-panel {
+  @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
+}
+
+.neon-glow-emerald {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.1), 0 0 40px rgba(16, 185, 129, 0.05);
+}
+
+.neon-glow-blue {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.1), 0 0 40px rgba(59, 130, 246, 0.05);
+}
+
+.neon-glow-purple {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.1), 0 0 40px rgba(168, 85, 247, 0.05);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
 }

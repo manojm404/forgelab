@@ -1,0 +1,39 @@
+# ForgeLab Workspace Git Ignore
+
+# Runtime State (never commit these)
+workspace-state.json
+*.lock
+
+# Agent Memory (contains sensitive user data and learned patterns)
+agents/*/memory.yaml
+agents/*/memory.lock
+
+# Temporary Files
+*.tmp
+*.bak
+*.deleted.bak
+*.txn.bak
+
+# Archive (backed up locally, not in git)
+agents_archive/
+
+# Context Files (auto-generated)
+PROJECT_CONTEXT.md
+PROJECT_CONTEXT.md.tmp
+PROJECT_HISTORY.md
+
+# Database
+*.db
+*.db-journal
+
+# Logs
+*.log
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Keep agent DNA (static identity files)
+# agents/*/agent.yaml - COMMITTED ✅
+# agents/*/AGENTS.md - COMMITTED ✅
+# agents/*/HEARTBEAT.md - COMMITTED ✅

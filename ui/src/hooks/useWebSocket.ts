@@ -1,6 +1,6 @@
 /**
- * WebSocket Hook for ForgeLab Real-Time Updates
- * 
+ * WebSocket Hook for ForgeLab Real-Time Updates (using Socket.IO)
+ *
  * Features:
  * - Auto-detect backend URL (tries common ports)
  * - Auto-reconnect with exponential backoff
@@ -11,11 +11,12 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { io, Socket } from 'socket.io-client';
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'error';
 
 export interface WSMessage {
-  type: 'blackboard:message' | 'task:update' | 'agent:status' | 'context:updated' | 'human:approval_required';
+  type: string;
   payload: any;
   timestamp: string;
 }
@@ -38,165 +39,116 @@ interface UseWebSocketOptions {
 }
 
 // Common backend ports to try
-const COMMON_PORTS = ['8000', '8001', '3001', '8080', '5000'];
-
-async function detectBackendUrl(): Promise<string> {
-  // Try provided baseUrl first, then common ports
-  for (const port of COMMON_PORTS) {
-    const url = `ws://localhost:${port}`;
-    try {
-      const ws = new WebSocket(url);
-      await new Promise((resolve, reject) => {
-        ws.onopen = () => {
-          ws.close();
-          resolve(url);
-        };
-        ws.onerror = () => reject(new Error('Connection failed'));
-        setTimeout(() => reject(new Error('Timeout')), 500);
-      });
-      return url;
-    } catch {
-      continue;
-    }
-  }
-  return 'ws://localhost:8000'; // Default fallback
-}
+const COMMON_PORTS = ['3001', '8000', '8001', '8080', '5000'];
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
   const {
     baseUrl,
     teamId,
     onMessage,
-    reconnectAttempts = 5,
-    reconnectInterval = 1000,
   } = options;
 
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
-  const [detectedUrl, setDetectedUrl] = useState<string>(baseUrl || 'ws://localhost:8000');
+  const [detectedUrl, setDetectedUrl] = useState<string>(baseUrl || 'http://localhost:3001');
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
   const [messages, setMessages] = useState<WSMessage[]>([]);
   const [blackboardMessages, setBlackboardMessages] = useState<BlackboardMessage[]>([]);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectCountRef = useRef(0);
-  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const heartbeatTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   // Connection status label
-  const connectionLabel = status === 'connected' ? 'Live' : 
-                          status === 'connecting' || status === 'reconnecting' ? 'Connecting...' : 
+  const connectionLabel = status === 'connected' ? 'Live' :
+                          status === 'connecting' || status === 'reconnecting' ? 'Connecting...' :
                           status === 'error' ? 'Error' : 'Offline';
 
   const connect = useCallback(async () => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    if (socketRef.current?.connected) {
       return;
     }
 
     setStatus('connecting');
 
-    // Auto-detect backend URL on first connection
-    const url = baseUrl || await detectBackendUrl();
+    // Use default or provided URL
+    const url = baseUrl || 'http://localhost:3001';
     setDetectedUrl(url);
 
     try {
-      const ws = new WebSocket(`${url}${teamId ? `/team/${teamId}` : ''}`);
+      const socket = io(url, {
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+      });
 
-      ws.onopen = () => {
-        console.log('[WS] Connected to', url);
+      socket.on('connect', () => {
+        console.log('[WS] Connected to', url, 'ID:', socket.id);
         setStatus('connected');
-        reconnectCountRef.current = 0;
+      });
 
-        // Start heartbeat
-        heartbeatTimerRef.current = setInterval(() => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping', timestamp: new Date().toISOString() }));
-          }
-        }, 30000); // 30 second heartbeat
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const message: WSMessage = JSON.parse(event.data);
-          setLastMessage(message);
-          setMessages(prev => [...prev.slice(-49), message]); // Keep last 50 messages
-          onMessage?.(message);
-
-          // Handle blackboard messages specifically
-          if (message.type === 'blackboard:message') {
-            setBlackboardMessages(prev => [...prev, {
-              id: message.payload.id || Date.now().toString(),
-              agentId: message.payload.agentId,
-              agentName: message.payload.agentName,
-              content: message.payload.content,
-              type: message.payload.type,
-              timestamp: message.payload.timestamp || new Date().toISOString(),
-            }].slice(-20)); // Keep last 20 blackboard messages
-          }
-        } catch (error) {
-          console.error('[WS] Parse error:', error);
-        }
-      };
-
-      ws.onclose = (event) => {
-        console.log('[WS] Closed:', event.code, event.reason);
+      socket.on('disconnect', (reason) => {
+        console.log('[WS] Disconnected:', reason);
         setStatus('disconnected');
-
-        // Clear heartbeat
-        if (heartbeatTimerRef.current) {
-          clearInterval(heartbeatTimerRef.current);
+        if (reason === 'io server disconnect') {
+          // the disconnection was initiated by the server, you need to reconnect manually
+          socket.connect();
         }
+      });
 
-        // Attempt reconnect
-        if (reconnectCountRef.current < reconnectAttempts) {
-          setStatus('reconnecting');
-          reconnectCountRef.current += 1;
-
-          const delay = reconnectInterval * Math.pow(2, reconnectCountRef.current - 1); // Exponential backoff
-          console.log(`[WS] Reconnecting in ${delay}ms (attempt ${reconnectCountRef.current}/${reconnectAttempts})`);
-
-          reconnectTimerRef.current = setTimeout(() => {
-            connect();
-          }, delay);
-        } else {
-          setStatus('error');
-          console.error('[WS] Max reconnect attempts reached');
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('[WS] Error:', error);
+      socket.on('connect_error', (error) => {
+        console.error('[WS] Connection error:', error);
         setStatus('error');
+      });
+
+      // Listen for all events (Socket.IO doesn't have a catch-all listener by default in v4, but we can emit specific events)
+      // For ForgeLab, we use specific events like 'transcript', 'run:status', etc.
+      
+      const handleGenericMessage = (type: string, payload: any) => {
+        const message: WSMessage = {
+          type,
+          payload,
+          timestamp: new Date().toISOString()
+        };
+        setLastMessage(message);
+        setMessages(prev => [...prev.slice(-49), message]);
+        onMessage?.(message);
+
+        // Handle blackboard messages specifically
+        if (type === 'blackboard:message') {
+          setBlackboardMessages(prev => [...prev, {
+            id: payload.id || Date.now().toString(),
+            agentId: payload.agentId,
+            agentName: payload.agentName,
+            content: payload.content,
+            type: payload.type,
+            timestamp: payload.timestamp || new Date().toISOString(),
+          }].slice(-20));
+        }
       };
 
-      wsRef.current = ws;
+      // Register specific listeners
+      socket.on('transcript', (data) => handleGenericMessage('transcript', data));
+      socket.on('run:status', (data) => handleGenericMessage('run:status', data));
+      socket.on('blackboard:message', (data) => handleGenericMessage('blackboard:message', data));
+      socket.on('human:approval_required', (data) => handleGenericMessage('human:approval_required', data));
+
+      socketRef.current = socket;
     } catch (error) {
-      console.error('[WS] Connection error:', error);
+      console.error('[WS] Setup error:', error);
       setStatus('error');
     }
-  }, [baseUrl, teamId, onMessage, reconnectAttempts, reconnectInterval]);
+  }, [baseUrl, onMessage]);
 
   const disconnect = useCallback(() => {
-    // Clear timers
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
     }
-    if (heartbeatTimerRef.current) {
-      clearInterval(heartbeatTimerRef.current);
-    }
-
-    // Close WebSocket
-    if (wsRef.current) {
-      wsRef.current.close(1000, 'Client disconnect');
-      wsRef.current = null;
-    }
-
     setStatus('disconnected');
   }, []);
 
-  const sendMessage = useCallback((type: string, payload: any) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      const message = { type, payload, timestamp: new Date().toISOString() };
-      wsRef.current.send(JSON.stringify(message));
+  const sendMessage = useCallback((event: string, payload: any) => {
+    if (socketRef.current?.connected) {
+      socketRef.current.emit(event, payload);
       return true;
     }
     console.warn('[WS] Cannot send message - not connected');
@@ -209,39 +161,19 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     rollbackFn: (value: T) => void,
     message: { type: string; payload: any }
   ) => {
-    // Apply update immediately
     const result = updateFn();
-
-    // Try to send to server
     const sent = sendMessage(message.type, message.payload);
-
-    // If send failed, rollback after timeout
     if (!sent) {
-      setTimeout(() => {
-        rollbackFn(result);
-      }, 1000);
+      setTimeout(() => rollbackFn(result), 1000);
     }
-
     return result;
   }, [sendMessage]);
 
   // Auto-connect on mount
   useEffect(() => {
     connect();
-
-    // Cleanup on unmount
-    return () => {
-      disconnect();
-    };
+    return () => disconnect();
   }, [connect, disconnect]);
-
-  // Reconnect when teamId changes
-  useEffect(() => {
-    if (teamId) {
-      disconnect();
-      connect();
-    }
-  }, [teamId]);
 
   return {
     // State
@@ -264,3 +196,4 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     isError: status === 'error',
   };
 }
+

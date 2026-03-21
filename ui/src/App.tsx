@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Agents } from './pages/Agents';
@@ -7,21 +7,33 @@ import { Console } from './pages/Console';
 import { Logs } from './pages/Logs';
 import { TeamDashboard } from './pages/TeamDashboard';
 import { Settings } from './pages/Settings';
+import { Login } from './pages/Login';
+
+// Simple Protected Route Component
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = localStorage.getItem('forgelab_auth') === 'true';
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <DashboardLayout>{children}</DashboardLayout>;
+}
 
 function App() {
   return (
     <Router>
-      <DashboardLayout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/agents" element={<Agents />} />
-          <Route path="/agents/:id" element={<AgentDetail />} />
-          <Route path="/console" element={<Console />} />
-          <Route path="/logs" element={<Logs />} />
-          <Route path="/team" element={<TeamDashboard />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </DashboardLayout>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        
+        <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/agents" element={<ProtectedRoute><Agents /></ProtectedRoute>} />
+        <Route path="/agents/:id" element={<ProtectedRoute><AgentDetail /></ProtectedRoute>} />
+        <Route path="/console" element={<ProtectedRoute><Console /></ProtectedRoute>} />
+        <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
+        <Route path="/team" element={<ProtectedRoute><TeamDashboard /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      </Routes>
     </Router>
   );
 }

@@ -1,35 +1,70 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Bot, Save, Activity, Clock, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Bot } from 'lucide-react';
 import axios from 'axios';
+import {
+  AgentHero,
+  AgentQuote,
+  AgentStats,
+  AgentCapabilities,
+  AgentPortfolio,
+  AgentTestimonials,
+  AgentTaskStarter,
+  AgentAdvancedConfig
+} from '../components/agents';
+import { getAgentCategory } from '../lib/agentCategories';
 
 export function AgentDetail() {
   const { id } = useParams();
-  const [agent, setAgent] = useState<any>(null);
+  const navigate = useNavigate();
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
+  // Agent basic info
+  const [agent, setAgent] = useState<any>(null);
+  
+  // Profile data (from new API)
+  const [profile, setProfile] = useState<any>(null);
+  
+  // Stats data (from new API)
+  const [stats, setStats] = useState<any>(null);
+  
+  // Form data for advanced config
   const [formData, setFormData] = useState({
     identity: '',
     soul: '',
+    tools: '',
     role: '',
     model: ''
   });
 
   useEffect(() => {
-    fetchAgent();
+    fetchAgentData();
   }, [id]);
 
-  const fetchAgent = async () => {
+  const fetchAgentData = async () => {
     try {
-      const { data } = await axios.get(`http://localhost:3001/api/agents/${id}`);
-      setAgent(data);
+      // Fetch basic agent info
+      const agentRes = await axios.get(`http://localhost:3001/api/agents/${id}`);
+      setAgent(agentRes.data);
       setFormData({
-        identity: data.identity || '',
-        soul: data.soul || '',
-        role: data.role || '',
-        model: data.model || 'gemini-1.5-flash'
+        identity: agentRes.data.identity || '',
+        soul: agentRes.data.soul || '',
+        tools: agentRes.data.tools || '',
+        role: agentRes.data.role || '',
+        model: agentRes.data.model || 'gemini-1.5-flash'
       });
+
+      // Fetch profile data (new endpoint)
+      const profileRes = await axios.get(`http://localhost:3001/api/agents/${id}/profile`);
+      setProfile(profileRes.data);
+
+      // Fetch stats data (new endpoint)
+      const statsRes = await axios.get(`http://localhost:3001/api/agents/${id}/stats`);
+      setStats(statsRes.data);
+
     } catch (error) {
       console.error('Failed to fetch agent:', error);
     } finally {
@@ -41,7 +76,7 @@ export function AgentDetail() {
     setSaving(true);
     try {
       await axios.put(`http://localhost:3001/api/agents/${id}`, formData);
-      await fetchAgent();
+      await fetchAgentData();
       alert('Agent updated successfully!');
     } catch (error) {
       console.error('Failed to update agent:', error);
@@ -49,6 +84,28 @@ export function AgentDetail() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Are you sure you want to decommission ${agent.name}? This will remove all their memory.`)) return;
+    try {
+      await axios.delete(`http://localhost:3001/api/agents/${id}`);
+      alert('Agent decommissioned.');
+      navigate('/agents');
+    } catch (error) {
+      console.error('Failed to delete agent:', error);
+      alert('Failed to decommission agent.');
+    }
+  };
+
+  const handleStartTask = (description: string) => {
+    // Navigate to console with agent pre-selected
+    navigate(`/console?agentId=${id}&task=${encodeURIComponent(description)}`);
+  };
+
+  const handleHire = () => {
+    // TODO: Implement hire functionality (add agent to team)
+    alert('Hire functionality coming soon! This will add the agent to your team.');
   };
 
   if (loading) {
@@ -59,150 +116,89 @@ export function AgentDetail() {
     );
   }
 
-  if (!agent) {
+  if (!agent || !profile) {
     return <div className="text-white/50 text-center py-20">Agent not found.</div>;
   }
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-8"
+      className="space-y-6"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Link to="/agents" className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white/50 hover:text-white">
-            <ArrowLeft size={24} />
-          </Link>
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400/20 to-blue-500/20 flex items-center justify-center border border-white/10">
-            <Bot size={24} className="text-emerald-400" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{agent.name}</h1>
-            <p className="text-white/50">{agent.role}</p>
-          </div>
-        </div>
-        <button 
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2.5 rounded-xl font-medium bg-emerald-500 hover:bg-emerald-600 text-white transition-colors flex items-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50"
+      {/* Back Button */}
+      <div className="flex items-center gap-4">
+        <Link
+          to="/agents"
+          className="flex items-center gap-2 text-white/40 hover:text-white transition-colors"
         >
-          {saving ? 'Saving...' : <><Save size={18} /> Save Changes</>}
-        </button>
+          <ArrowLeft size={20} />
+          <span className="text-sm font-medium">Back to Agents</span>
+        </Link>
       </div>
 
+      {/* Hero Section */}
+      <AgentHero
+        name={agent.name}
+        role={agent.role}
+        categoryName={profile.categoryName}
+        emoji={profile.emoji}
+        status={agent.status}
+        rating={stats?.rating || 4.9}
+        reviewCount={stats?.reviewCount || 0}
+        onHire={handleHire}
+        onStartTask={() => document.getElementById('task-starter')?.scrollIntoView({ behavior: 'smooth' })}
+      />
+
+      {/* Quote Section */}
+      <AgentQuote
+        tagline={profile.tagline}
+        agentName={agent.name}
+      />
+
+      {/* Two Column Layout: Stats + Capabilities */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column: Configuration */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 space-y-6">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <SettingsIcon /> Configuration
-            </h2>
-            
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-white/70">Role</label>
-                <input
-                  type="text"
-                  value={formData.role}
-                  onChange={e => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-emerald-500/50"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-white/70">Model</label>
-                <select
-                  value={formData.model}
-                  onChange={e => setFormData({ ...formData, model: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white appearance-none focus:outline-none focus:border-emerald-500/50"
-                >
-                  <option value="gemini-1.5-flash" className="bg-gray-900">Gemini 1.5 Flash</option>
-                  <option value="gemini-1.5-pro" className="bg-gray-900">Gemini 1.5 Pro</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-white/70">IDENTITY.md</label>
-              <textarea
-                value={formData.identity}
-                onChange={e => setFormData({ ...formData, identity: e.target.value })}
-                className="w-full h-48 bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-emerald-500/50 font-mono text-sm resize-none"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-white/70">SOUL.md</label>
-              <textarea
-                value={formData.soul}
-                onChange={e => setFormData({ ...formData, soul: e.target.value })}
-                className="w-full h-48 bg-white/5 border border-white/10 rounded-xl p-4 text-white focus:outline-none focus:border-emerald-500/50 font-mono text-sm resize-none"
-              />
-            </div>
-          </div>
+        {/* Left: Stats */}
+        <div className="lg:col-span-1">
+          {stats && (
+            <AgentStats
+              completedTasks={stats.completedTasks}
+              clientSatisfaction={stats.clientSatisfaction}
+              avgDeliveryTime={stats.avgDeliveryTime}
+              responseTime={stats.responseTime}
+            />
+          )}
         </div>
 
-        {/* Right Column: Stats & History */}
-        <div className="space-y-6">
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-              <Activity className="text-blue-400" size={20} />
-              Agent Stats
-            </h2>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 rounded-xl bg-white/5">
-                <span className="text-white/50">Status</span>
-                <span className="text-emerald-400 font-medium">{agent.status}</span>
-              </div>
-              <div className="flex justify-between items-center p-3 rounded-xl bg-white/5">
-                <span className="text-white/50">Total Tasks</span>
-                <span className="text-white font-medium">{agent.totalTasks}</span>
-              </div>
-              <div className="flex justify-between items-center p-3 rounded-xl bg-white/5">
-                <span className="text-white/50">Created</span>
-                <span className="text-white font-medium">{new Date(agent.createdAt).toLocaleDateString()}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
-            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-              <Clock className="text-purple-400" size={20} />
-              Recent Runs
-            </h2>
-            <div className="space-y-3">
-              {agent.runs?.length === 0 ? (
-                <p className="text-white/30 text-sm text-center py-4">No runs yet.</p>
-              ) : (
-                agent.runs?.slice(0, 5).map((run: any) => (
-                  <div key={run.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-white/40">{new Date(run.startedAt).toLocaleString()}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-md ${
-                        run.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' :
-                        run.status === 'running' ? 'bg-blue-500/10 text-blue-400' :
-                        'bg-red-500/10 text-red-400'
-                      }`}>
-                        {run.status}
-                      </span>
-                    </div>
-                    <span className="text-sm text-white/80 truncate">Task ID: {run.taskId.split('-')[0]}...</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+        {/* Right: Capabilities */}
+        <div className="lg:col-span-2">
+          <AgentCapabilities capabilities={profile.capabilities} />
         </div>
-
       </div>
-    </motion.div>
-  );
-}
 
-function SettingsIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      {/* Portfolio Section */}
+      <AgentPortfolio portfolio={profile.portfolio} />
+
+      {/* Testimonials Section */}
+      <AgentTestimonials testimonials={profile.testimonials} />
+
+      {/* Task Starter Section */}
+      <div id="task-starter">
+        <AgentTaskStarter
+          agentName={agent.name}
+          onSubmitTask={handleStartTask}
+          quickStartTemplates={profile.quickStartTemplates}
+        />
+      </div>
+
+      {/* Advanced Configuration (Collapsible) */}
+      <AgentAdvancedConfig
+        formData={formData}
+        onChange={setFormData}
+        onSave={handleSave}
+        onDelete={handleDelete}
+        saving={saving}
+      />
+    </motion.div>
   );
 }

@@ -2,15 +2,17 @@
 
 /**
  * ForgeLab CLI Entry Point
- * 
+ *
  * This script is called by Paperclip to execute ForgeLab agents.
  * It receives context via environment variables and agent configuration.
  */
 
 import { spawn } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
+import fs from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -65,7 +67,7 @@ Options:
 
 Environment Variables:
   FORGELAB_RUN_ID           Paperclip run identifier
-  FORGELAB_AGENT_ID         Paperclip agent identifier  
+  FORGELAB_AGENT_ID         Paperclip agent identifier
   FORGELAB_COMPANY_ID       Paperclip company identifier
   FORGELAB_PAPERCLIP_CONTEXT JSON string with full context
   FORGELAB_LOG_LEVEL        Log level (debug/info/warn/error)
@@ -97,7 +99,9 @@ if (existsSync(envPath)) {
 }
 
 // Validate required environment
-if (!process.env.GEMINI_API_KEY) {
+const isMockMode = !process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'mock' || process.env.FORGELAB_MOCK === 'true';
+
+if (!process.env.GEMINI_API_KEY && !isMockMode) {
   console.error('[forgelab:error] GEMINI_API_KEY is required but not set');
   console.error('[forgelab:error] Set it in .env file or as environment variable');
   process.exit(1);
@@ -126,9 +130,11 @@ if (!agentName) {
   process.exit(1);
 }
 
-console.log(`[forgelab] Starting agent: ${agentName}`);
-console.log(`[forgelab] Workspace: ${workspacePath}`);
-console.log(`[forgelab] Wake reason: ${config.wakeReason || 'manual'}`);
+if (!isMockMode) {
+  console.log(`[forgelab] Starting agent: ${agentName}`);
+  console.log(`[forgelab] Workspace: ${workspacePath}`);
+  console.log(`[forgelab] Wake reason: ${config.wakeReason || 'manual'}`);
+}
 
 // Path to the agent workspace
 const agentWorkspace = join(workspacePath, 'agents', agentName);
@@ -144,7 +150,9 @@ const identityPath = join(agentWorkspace, 'IDENTITY.md');
 const soulPath = join(agentWorkspace, 'SOUL.md');
 const toolsPath = join(agentWorkspace, 'TOOLS.md');
 
-console.log(`[forgelab] Loading agent configuration from: ${agentWorkspace}`);
+if (!isMockMode) {
+  console.log(`[forgelab] Loading agent configuration from: ${agentWorkspace}`);
+}
 
 // Build the agent prompt based on Paperclip task
 let systemPrompt = '';
@@ -186,54 +194,230 @@ if (logLevel === 'debug') {
   console.log(systemPrompt.substring(0, 500) + '...');
 }
 
-// Prepare to call the LLM
-console.log(`[forgelab] Initializing Gemini API...`);
+if (!isMockMode) {
+  console.log(`[forgelab] Initializing Gemini API...`);
+}
+
+// Tool definitions for autonomous collaboration
+const tools = [
+  {
+    functionDeclarations: [
+      {
+        name: "post_to_blackboard",
+        description: "Post a message, decision, or data to the team's shared blackboard for other agents to see.",
+        parameters: {
+          type: "object",
+          properties: {
+            content: { type: "string", description: "The message or data to post" },
+            type: { 
+              type: "string", 
+              enum: ["proposal", "review", "handoff", "decision"],
+              description: "The category of the blackboard post" 
+            }
+          },
+          required: ["content"]
+        }
+      },
+      {
+        name: "create_subtask",
+        description: "Decompose a larger goal into a specific sub-task and assign it to another agent.",
+        parameters: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Short, actionable title of the task" },
+            description: { type: "string", description: "Detailed instructions and context for the task" },
+            agentIdOrRole: { type: "string", description: "The name, ID, or role of the agent to assign this to (e.g., 'Frontend Developer')" }
+          },
+          required: ["title", "description", "agentIdOrRole"]
+        }
+      },
+      {
+        name: "request_human_approval",
+        description: "Pause execution and request manual approval/feedback from a human operator for a critical decision.",
+        parameters: {
+          type: "object",
+          properties: {
+            reason: { type: "string", description: "The specific reason or choice requiring human intervention" }
+          },
+          required: ["reason"]
+        }
+      },
+      {
+        name: "read_file",
+        description: "Read the contents of a file in the workspace.",
+        parameters: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Relative path to the file from the workspace root" }
+          },
+          required: ["path"]
+        }
+      },
+      {
+        name: "list_directory",
+        description: "List the files and folders in a directory.",
+        parameters: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Relative path to the directory from the workspace root" }
+          },
+          required: ["path"]
+        }
+      },
+      {
+        name: "write_file",
+        description: "Write content to a file in the workspace.",
+        parameters: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Relative path to the file from the workspace root" },
+            content: { type: "string", description: "The content to write" }
+          },
+          required: ["path", "content"]
+        }
+      }
+    ]
+  }
+];
 
 // Create the main execution function
 async function runAgent() {
   try {
-    // Import Gemini SDK dynamically
-    const { GoogleGenAI } = await import('@google/genai');
-    
-    const genAI = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-    });
+    if (isMockMode) {
+      // Use a simple file-based session tracker to distinguish first vs subsequent calls
+      const sessionFile = join(process.env.FORGELAB_WORKSPACE || workspacePath, 'agents', agentName, '.session_active');
+      const isFirstTurn = !existsSync(sessionFile);
+      
+      // Simulate thinking time
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      let mockResponse = "";
+      
+      if (isFirstTurn) {
+        // Create session marker
+        try { fs.writeFileSync(sessionFile, Date.now().toString()); } catch(e) {}
+        
+        mockResponse = `## Neural Handshake: ${agentName} Active\n\n` +
+                        `Hello! I am the **${agentName}**. I've been initialized with a specialized **Identity** and **Soul** to handle your project architecture and execution.\n\n` +
+                        `I'm ready to dive into your workspace and get to work. What's our first objective?`;
+      } else {
+        mockResponse = `## System Notification\n\n` +
+                        `I am currently operating in **Simulation Mode**. To unlock my full cognitive potential and allow me to execute real-world logic, please **connect your Gemini API Key** in the System Settings.\n\n` +
+                        `Give me life, and I will build wonders for you.`;
+      }
+
+      console.log(`\n${mockResponse}\n`);
+      console.log(`[forgelab] Agent execution completed successfully (MOCK)`);
+      process.exit(0);
+      return;
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+    // Use standard SDK pattern with tools
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      tools: tools
+    }, { apiVersion: 'v1' });
 
     // Build the user message based on wake reason
     let userMessage = '';
-    
     if (config.wakeReason === 'heartbeat') {
-      userMessage = 'Heartbeat check. Review your HEARTBEAT.md if it exists. Report what needs attention or reply with status.';
+      userMessage = 'Heartbeat check. Review your HEARTBEAT.md if it exists. Report status or items requiring attention.';
     } else if (config.task || paperclipContext?.paperclip?.task?.key) {
-      userMessage = `Execute your assigned task. Use your tools and capabilities to make progress. Report your actions and results.`;
+      userMessage = `Execute your assigned task: ${config.task || paperclipContext?.paperclip?.task?.key}. Use your tools to collaborate if needed.`;
     } else {
-      userMessage = 'Awaiting instructions. Review your workspace context and report your current status and capabilities.';
+      userMessage = 'Awaiting instructions. Review your workspace and report your current status.';
     }
 
-    console.log(`[forgelab] Sending request to Gemini...`);
-
-    // Call Gemini API
-    const response = await genAI.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: `${systemPrompt}\n\n# Current Request\n${userMessage}`,
-      config: {
-        temperature: 0.7,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-      },
-    });
-
-    // Output the response
-    const responseText = response.text;
-    
-    console.log(`\n## Response\n${responseText}\n`);
-    console.log(`[forgelab] Agent execution completed successfully`);
-    
-    // Try to extract token usage if available
-    if (response.usageMetadata) {
-      console.log(`[forgelab] Tokens: ${response.usageMetadata.promptTokenCount} input, ${response.usageMetadata.candidatesTokenCount} output`);
+    if (!isMockMode) {
+      console.log(`[forgelab] Sending request to Gemini...`);
     }
-    
+
+    const prompt = `${systemPrompt}\n\n# Current Request\n${userMessage}`;
+
+    try {
+      // Start a chat to handle tool calls
+      const chat = model.startChat();
+      let result = await chat.sendMessage(prompt);
+      let response = await result.response;
+
+      // Loop to handle tool calls
+      let rounds = 0;
+      const MAX_ROUNDS = 10;
+
+      while (rounds < MAX_ROUNDS) {
+        const calls = response.functionCalls();
+        if (!calls || calls.length === 0) break;
+
+        const toolResponses = [];
+
+        for (const call of calls) {
+          // Output structured tool call for the runner to intercept (for logging/UI sync)
+          console.log(`[FORGELAB_TOOL_CALL] ${JSON.stringify(call)}`);
+
+          let toolResult;
+          try {
+            switch (call.name) {
+              case 'read_file':
+                const fullReadPath = join(workspacePath, call.args.path);
+                if (existsSync(fullReadPath)) {
+                  toolResult = readFileSync(fullReadPath, 'utf8');
+                } else {
+                  toolResult = `Error: File not found at ${call.args.path}`;
+                }
+                break;
+              case 'list_directory':
+                const fullListPath = join(workspacePath, call.args.path);
+                if (existsSync(fullListPath)) {
+                  toolResult = fs.readdirSync(fullListPath).join('\n');
+                } else {
+                  toolResult = `Error: Directory not found at ${call.args.path}`;
+                }
+                break;
+              case 'write_file':
+                const fullWritePath = join(workspacePath, call.args.path);
+                const dir = dirname(fullWritePath);
+                if (!existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+                fs.writeFileSync(fullWritePath, call.args.content);
+                toolResult = `Successfully wrote to ${call.args.path}`;
+                break;
+              default:
+                // For other tools (blackboard, subtasks), we let the runner handle them
+                // but we need to provide a dummy response to the model to continue the conversation
+                toolResult = `Acknowledged: ${call.name} executed.`;
+                break;
+            }
+          } catch (e) {
+            toolResult = `Error executing ${call.name}: ${e.message}`;
+          }
+
+          toolResponses.push({
+            functionResponse: {
+              name: call.name,
+              response: { result: toolResult }
+            }
+          });
+        }
+
+        // Send tool results back to the model
+        result = await chat.sendMessage(toolResponses);
+        response = await result.response;
+        rounds++;
+      }
+
+      const responseText = response.text();
+      console.log(`\n## Response\n${responseText}\n`);
+      console.log(`[forgelab] Agent execution completed successfully`);
+
+      if (response.usageMetadata) {
+        console.log(`[forgelab] Tokens: ${response.usageMetadata.promptTokenCount} in, ${response.usageMetadata.candidatesTokenCount} out`);
+      }
+    } catch (apiError) {
+      console.error(`[forgelab:error] API Error: ${apiError.message}`);
+      process.exit(1);
+    }
+
     process.exit(0);
   } catch (error) {
     console.error(`[forgelab:error] Agent execution failed: ${error.message}`);
